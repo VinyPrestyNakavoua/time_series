@@ -1,0 +1,39 @@
+---
+title: "projet Series chronologiques"
+author: "Viny Presty NAKAVOUA"
+date: "2024-11-06"
+output: html_document
+---
+
+
+# 0. Objectif
+On a les données d'une personne qui a réalisé une expérience
+premiere phase avant regime et therapie : se pèse plusieurs fois par jour 
+Deuxieme phase : se pèse une seule fois par jour durant le regime pendant deux semaines
+
+
+# 1. importation des données
+
+```{r}
+library(readr)
+data <- read_csv("poids.csv")
+```
+
+
+```{r}
+head(data)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
