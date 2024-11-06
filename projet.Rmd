@@ -14,7 +14,7 @@ Deuxieme phase : se pèse une seule fois par jour durant le regime pendant deux 
 
 # 1. importation des données
 
-```{r}
+```{r, results='hide'}
 library(readr)
 data <- read_csv("poids.csv")
 ```
@@ -25,8 +25,37 @@ head(data)
 ```
 
 
+## pretraitement :
+
+```{r}
+data <- as.data.frame(data)
+```
+
+```{r}
+data$Jour <- as.Date(data$Jour, format = "%d/%m/%y")
+```
+
+```{r}
+head(data)
+```
 
 
+```{r}
+plot(x=data$Jour, y=data$Poids)
+```
+
+
+
+## separer le dataset
+
+Créer un dataset pour la premiere phase et un second pour la 2e phase.
+
+
+# 2. Lissage par la méthode de regression locale
+
+```{r}
+# juste prendre le code dans le tutoriel, après s'être entendu sur le choix de la variable à confronter avec le poids : soit le jour ou l'heure ?
+```
 
 
 
