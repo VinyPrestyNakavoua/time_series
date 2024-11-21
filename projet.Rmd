@@ -15,47 +15,267 @@ Deuxieme phase : se pèse une seule fois par jour durant le regime pendant deux 
 # 1. importation des données
 
 ```{r, results='hide'}
-library(readr)
-data <- read_csv("poids.csv")
+library(readxl)
+data1 <- read_excel("poids.xlsx", sheet = "Poids_phase_1")
 ```
 
 
 ```{r}
-head(data)
+library(readxl)
+data2 <- read_excel("poids.xlsx", sheet = "Poids_phase_2")
 ```
 
 
-## pretraitement :
 
 ```{r}
-data <- as.data.frame(data)
-```
-
-```{r}
-data$Jour <- as.Date(data$Jour, format = "%d/%m/%y")
-```
-
-```{r}
-head(data)
+# un head pour voir les 6 premières valeurs
+head(data1)
 ```
 
 
 ```{r}
-plot(x=data$Jour, y=data$Poids)
+# un head pour voir les 6 premières valeurs
+head(data2)
 ```
 
 
-
-## separer le dataset
-
-Créer un dataset pour la premiere phase et un second pour la 2e phase.
-
-
-# 2. Lissage par la méthode de regression locale
 
 ```{r}
-# juste prendre le code dans le tutoriel, après s'être entendu sur le choix de la variable à confronter avec le poids : soit le jour ou l'heure ?
+# on le met en dataframe
+data1 <- as.data.frame(data1)
 ```
+
+
+```{r}
+# on le met en dataframe
+data2 <- as.data.frame(data2)
+```
+
+
+## 1.1 pretraitement de la variable jour:
+
+### pour les données de la première phase
+
+```{r}
+data1$Jour <- as.Date(data1$Jour, format = "%d/%m/%y")
+```
+
+
+```{r}
+head(data1)
+```
+
+
+### pour les données de la deuxième phase
+
+```{r}
+data2$Jour <- as.Date(data2$Jour)
+```
+
+
+```{r}
+head(data2)
+```
+
+
+```{r}
+## view des deux datasets
+View(data1)
+View(data2)
+```
+
+
+## 1.2 pretraitement de la variable Poids:
+
+### pour les données de la première phase
+
+```{r}
+any(is.na(data1$Poids))
+```
+
+
+#### choix de la méthode d'imputation :
+
+  on remarque que les données observées ne varient pas beaucoup (entre 99 et 100 kg environ), ce qui est normal car une personne qui n'est pas malade ne perd pas plusieurs kg en une journée.
+  Du coup, l'imputation devient facile car on pourrait imputer par la médiane selon le jour, c'est-à-dire, la valeur manquante d'un jour sera remplacée par le poids médian du même jour.
+
+on a pensé à cela mais c'est pas très bon parce que
+
+```{r}
+# Imputation des valeurs manquantes par la médiane journalière
+library(dplyr)
+data1 <- data1 %>%
+  group_by(Jour) %>%
+  mutate(Poids = ifelse(is.na(Poids), mean(Poids, na.rm = TRUE), Poids))
+
+```
+
+
+
+```{r}
+any(is.na(data1$Poids)) # Vérifie si des valeurs manquantes existent dans Poids
+```
+
+```{r}
+is.numeric(data1$Poids)
+```
+
+
+### pour les données de la deuxième phase
+
+```{r}
+any(is.na(data2$Poids))
+```
+
+il n'y a pas de na donc pas de pretraitement à faire ici.
+
+
+## 1.3 pretraitement de la variable Heure:
+
+### pour les données de la première phase
+
+```{r}
+is.numeric(data1$Heure) # ce ne sont pas des données numériques
+any(is.na(data1$Heure)) # il y a des na
+```
+
+
+```{r}
+library(hms)
+data1$Heure <- as_hms(strptime(gsub("h", ":", data1$Heure), format = "%H:%M"))
+
+```
+
+
+
+```{r}
+# convertissons les heures en format décimal
+data1$Heure <- ifelse(is.na(data1$Heure), NA, as.numeric(format(strptime(data1$Heure, "%H:%M"), "%H")) +
+                           as.numeric(format(strptime(data1$Heure, "%H:%M"), "%M")) / 60)
+
+```
+
+
+
+```{r}
+# imputons les heures manquantes
+# l'idée ici est de trouver le mean des heures les plus proches : c'est la métode d'interpolation
+# Installer le package "zoo" si nécessaire
+library(zoo)
+
+# Fonction pour interpoler les NA par la moyenne des voisins
+data1$Heure <- zoo::na.approx(data1$Heure, na.rm = FALSE)
+
+```
+
+
+
+### pour les données de la deuxième phase
+
+```{r}
+is.numeric(data2$Heure) # ce ne sont pas des données numériques
+any(is.na(data2$Heure)) # il n'y a pas des na
+```
+
+
+```{r}
+library(hms)
+data2$Heure <- as_hms(strptime(gsub("h", ":", data2$Heure), format = "%H:%M"))
+
+```
+
+
+```{r}
+# convertissons les heures en format décimal
+data2$Heure <- ifelse(is.na(data2$Heure), NA, as.numeric(format(strptime(data2$Heure, "%H:%M"), "%H")) +
+                           as.numeric(format(strptime(data2$Heure, "%H:%M"), "%M")) / 60)
+
+```
+
+
+
+## 1.3 plotting des variables de l'étude :
+
+### pour les données de la première phase
+
+
+```{r}
+plot(x=data1$Heure, y=data1$Poids)
+```
+
+cette donnée à 0h doit etre mis en fin de journée comme 0h = 24h
+
+```{r}
+which(data1$Heure == 0)
+```
+
+```{r}
+data1$Heure[48] = 24
+```
+
+
+
+
+### pour les données de la deuxième phase
+
+```{r}
+plot(x=data2$Heure, y=data2$Poids)
+```
+
+
+
+# 2. Lissage par la méthode de regression locale : le poids en fonction de la variable heure
+
+## 2.1 modélisation des différences de poids sans tenir compte du jour, cela donne la variable de poids
+
+
+```{r}
+res_loess <- loess(Poids~Heure,data=data1,span = 0.3)
+```
+
+
+```{r}
+## ajoutons une colonne des valeurs ajustées dans le data1frame
+data1$y <- res_loess$fitted
+```
+
+
+
+```{r}
+## representation graphique
+library(ggplot2)
+ggplot(data1,aes(x=Heure,y=Poids)) +
+geom_point() +
+geom_line(aes(y=y),col="red",size=1)
+
+```
+
+
+
+# 3.Calculez l’évolution du poids pendant la seconde phase indépendamment des variations dans la journée.
+
+comme dans la consigne, 
+ 104.7kg effectuée à 18h50
+ on va chercher la valeur lissée à 18h50 donc y dans data1 quand heure = 18h50
+ et  la valeur à midi de la série lissée
+ puis trouver l'ecart entre les deux.
+ puisqu’on a observé 104.7kg à 18h50, on peut en déduire que le poids à midi sur cette journée sera 104.7 kg +- cet ecart.
+ 
+ 
+
+```{r}
+which(data1$Heure) = 12
+valeur_midi <- data1$
+```
+
+
+
+
+
+
+
+
+
 
 
 
