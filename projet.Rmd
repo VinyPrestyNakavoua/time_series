@@ -97,12 +97,12 @@ any(is.na(data1$Poids))
 #### choix de la méthode d'imputation :
 
   on remarque que les données observées ne varient pas beaucoup (entre 99 et 100 kg environ), ce qui est normal car une personne qui n'est pas malade ne perd pas plusieurs kg en une journée.
-  Du coup, l'imputation devient facile car on pourrait imputer par la médiane selon le jour, c'est-à-dire, la valeur manquante d'un jour sera remplacée par le poids médian du même jour.
+  Du coup, l'imputation devient facile car on pourrait imputer par la moyenne selon le jour, c'est-à-dire, la valeur manquante d'un jour sera remplacée par le poids médian du même jour.
 
 on a pensé à cela mais c'est pas très bon parce que
 
 ```{r}
-# Imputation des valeurs manquantes par la médiane journalière
+# Imputation des valeurs manquantes par la moyenne journalière
 library(dplyr)
 data1 <- data1 %>%
   group_by(Jour) %>%
@@ -229,6 +229,8 @@ plot(x=data2$Heure, y=data2$Poids)
 ## 2.1 modélisation des différences de poids sans tenir compte du jour, cela donne la variable de poids
 
 
+
+
 ```{r}
 res_loess <- loess(Poids~Heure,data=data1,span = 0.3)
 ```
@@ -264,25 +266,73 @@ comme dans la consigne,
  
 
 ```{r}
-which(data1$Heure) = 12
-valeur_midi <- data1$
+valeur_lisse_midi <- predict(res_loess, 12.00)
+valeur_lisse_midi
+```
+
+utiliser la fonction predict (loess, newdata) avec newdata = colonne des heures pour lesquelles on veut les predictions
+
+```{r}
+# on calcule les predictions du poids a midi des jours de la 2e phase
+data2$poids_lisse <- predict(res_loess, data2$Heure)
+```
+
+
+```{r}
+# on calcule lecart entre la valeur lisse a midi et ces poids a midi
+data2$ecart <- valeur_lisse_midi - data2$poids_lisse
+```
+
+
+```{r}
+data2$poids_midi <- data2$Poids + data2$ecart
+```
+
+
+
+```{r}
+## representation graphique
+library(ggplot2)
+ggplot(data2,aes(x=Jour,y=Poids)) +
+geom_point() +
+geom_line(aes(y=poids_midi),col="red",size=1)
 ```
 
 
 
 
+#  4. En déduire l’évolution de la quantité matière grasse (en kilogramme) pendant la seconde phase.
+
+l'idée ici est de calculer cette quantité en kg en faisant une règle de trois.
+pour le premier jour si 100% de matière grace donne 104.7
+                        32.8% donne donne x
+                        
+```{r}
+data2$Graisse_kg <- (data2$`Graisse_%` *data2$Poids)/100
+```
+
+
+# Représenter l’évolution de la quantité de matière grasse et la commenter. De plus, indiquer la quantité de matière grasse perdue au terme du régime.
+
+```{r}
+library(ggplot2)
+ggplot(data2,aes(x=Jour,y=Graisse_kg)) +
+geom_line()
+```
+
+La quantité de matière grasse a fortement augmenté entre la fin du mois de mars et le debut du mois d'avril et baisse enormement après le 05 avril.
+
+
+```{r}
+data2$Graisse_kg[1] - data2$Graisse_kg[length(data2$Jour)]
+```
+
+La quantité totale de matière grasse perdue est de  2.4019 kg, passant de Y 34.3416 kg au début à 31.9397 kg à la fin du régime.
 
 
 
-
-
-
-
-
-
-
-
-
+# 6. faire la prévision de matière grasse perdue si le régime avait duré 3 jours de plus
+il faut faire une modélisation.
 
 
 
