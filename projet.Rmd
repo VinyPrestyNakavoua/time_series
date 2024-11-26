@@ -94,22 +94,18 @@ any(is.na(data1$Poids))
 ```
 
 
+```{r}
+length(which(is.na(data1$Poids)== TRUE))
+```
+on a 34 données manquantes dans la colonne poids sur les 114.
+
 #### choix de la méthode d'imputation :
 
-  on remarque que les données observées ne varient pas beaucoup (entre 99 et 100 kg environ), ce qui est normal car une personne qui n'est pas malade ne perd pas plusieurs kg en une journée.
-  Du coup, l'imputation devient facile car on pourrait imputer par la moyenne selon le jour, c'est-à-dire, la valeur manquante d'un jour sera remplacée par le poids médian du même jour.
-
-on a pensé à cela mais c'est pas très bon parce que
+On choisit simplement de supprimer les jours pour lesquels on n'a pas le poids observé, car bien qu'on observe une faible variable du poids, cela n'exclut pas le fait qu'une personne peut prendre 2kg en un jour et/ou perdre 2kg le lendemain. du coup, estimer ces poids manquants avec de simples méthodes d'imputation comme par moyenne ou par médian ne serait pas judicieux.
 
 ```{r}
-# Imputation des valeurs manquantes par la moyenne journalière
-library(dplyr)
-data1 <- data1 %>%
-  group_by(Jour) %>%
-  mutate(Poids = ifelse(is.na(Poids), mean(Poids, na.rm = TRUE), Poids))
-
+data1 <- data1[-which(is.na(data1$Poids)== TRUE),]
 ```
-
 
 
 ```{r}
@@ -206,11 +202,11 @@ plot(x=data1$Heure, y=data1$Poids)
 cette donnée à 0h doit etre mis en fin de journée comme 0h = 24h
 
 ```{r}
-which(data1$Heure == 0)
+p <- which(data1$Heure == 0)
 ```
 
 ```{r}
-data1$Heure[48] = 24
+data1$Heure[p] = 24
 ```
 
 
@@ -333,6 +329,32 @@ La quantité totale de matière grasse perdue est de  2.4019 kg, passant de Y 34
 
 # 6. faire la prévision de matière grasse perdue si le régime avait duré 3 jours de plus
 il faut faire une modélisation.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
