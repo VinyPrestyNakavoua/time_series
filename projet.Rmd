@@ -328,32 +328,191 @@ La quantité totale de matière grasse perdue est de  2.4019 kg, passant de Y 34
 
 
 # 6. faire la prévision de matière grasse perdue si le régime avait duré 3 jours de plus
+
 il faut faire une modélisation.
+vue qu'on n'observe pas de tendance, on va plutot essayer de modéliser cette serie de données en utilisant deux regressions lineaires.
+
+## 6.1 pretraitement de la variable jour :
+
+```{r}
+data2$Jour_num <- as.numeric(as.Date(data2$Jour))
+```
+
+
+
+```{r}
+mode(data2$Jour_num)
+```
 
 
 
 
+## 6.2 segmentation du jeu de données de la 2e phase
+
+
+
+```{r}
+# le point le plus haut (jour où il a atteint la quantité de matière grace maximum est 2021-04-01)
+
+which(data2$Graisse_kg==max(data2$Graisse_kg))
+
+```
+
+
+```{r}
+to = which(data2$Graisse_kg==max(data2$Graisse_kg))
+```
+
+
+```{r}
+to
+```
+
+
+```{r}
+ech1 <- data2[(1:to),]
+```
+
+
+
+```{r}
+ech2 <- data2[-(1:to),]
+```
+
+
+```{r}
+head(ech1)
+```
+
+
+## 6.3 visualisation des deux echantillons
+
+```{r}
+library(ggplot2)
+ggplot(ech1,aes(x=Jour,y=Graisse_kg)) +
+geom_point()
+```
 
 
 
 
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()
+```
 
 
 
 
+On voit alors qu'on peut facilement faire des regressions lineaires sur nos deux échantillons.
+
+
+## 6.4 Regression lineaire
+
+### 6.4.1 Echantillon 1
+
+
+```{r}
+res_lm1 <- lm(Graisse_kg~Jour_num, data=ech1)
+```
+
+
+
+```{r}
+library(ggplot2)
+ggplot(ech1,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)
+
+```
 
 
 
 
+### 6.4.2 Echantillon 1
+
+
+```{r}
+res_lm2 <- lm(Graisse_kg~Jour_num, data=ech2)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)
+
+```
 
 
 
+## 6.5 Les trois prochains jours 
+
+```{r}
+t1 <- as.numeric(as.Date("2021-04-08"))
+t2 <- as.numeric(as.Date("2021-04-09"))
+t3 <- as.numeric(as.Date("2021-04-10"))
+
+```
+
+
+```{r}
+data3 <- data.frame(c(t1,t2,t3))
+```
+
+```{r}
+colnames(data3) <- "Jour_num"
+```
 
 
 
+```{r}
+data3
+```
+
+
+```{r}
+graisse_predict <- predict.lm(res_lm2, data3)
+graisse_predict
+```
+
+Choix du modèle : Le choix d'utiliser res_lm2 pour les prévisions est judicieux, car il représente la tendance la plus récente et est donc plus pertinent pour les prévisions à court terme.
+
+## 6.6 visualisation de la quantité de matières grasse predictes
+
+
+```{r}
+data3$Jour <- c(as.Date("2021-04-08"), as.Date("2021-04-09"), as.Date("2021-04-10"))
+data3$Graisse_kg <- graisse_predict
+```
+
+
+```{r}
+data3
+```
 
 
 
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)+
+geom_point(data = data3, aes(x = Jour, y = Graisse_kg), color = "red")
+
+
+```
+
+
+```{r}
+data2$Graisse_kg[1] - data3$Graisse_kg[length(data3$Graisse_kg)]
+```
+
+
+
+Alors si cette personne avait continué le regime, elle aurait perdu 4.218229 kg contre 2.4019 kg si elle n'avait pas continué le regime.
 
 
 
