@@ -1,0 +1,528 @@
+---
+title: "projet Series chronologiques"
+author: "Viny Presty NAKAVOUA"
+date: "2024-11-06"
+output: html_document
+---
+
+
+# 0. Objectif
+On a les données d'une personne qui a réalisé une expérience
+premiere phase avant regime et therapie : se pèse plusieurs fois par jour 
+Deuxieme phase : se pèse une seule fois par jour durant le regime pendant deux semaines
+
+
+```{r, echo=FALSE, message=FALSE}
+library(readxl)
+library(zoo)
+library(ggplot2)
+library(dplyr)
+library(readxl)
+```
+
+
+
+# 1. importation des données
+
+```{r}
+data1 <- read_excel("poids.xlsx", sheet = "Poids_phase_1")
+```
+
+
+```{r}
+
+data2 <- read_excel("poids.xlsx", sheet = "Poids_phase_2")
+```
+
+
+
+```{r}
+# un head pour voir les 6 premières valeurs
+head(data1)
+```
+
+
+```{r}
+# un head pour voir les 6 premières valeurs
+head(data2)
+```
+
+
+
+```{r}
+# on le met en dataframe
+data1 <- as.data.frame(data1)
+```
+
+
+```{r}
+# on le met en dataframe
+data2 <- as.data.frame(data2)
+```
+
+
+## 1.1 pretraitement de la variable jour:
+
+### pour les données de la première phase
+
+```{r}
+data1$Jour <- as.Date(data1$Jour, format = "%d/%m/%y")
+```
+
+
+```{r}
+head(data1)
+```
+
+
+### pour les données de la deuxième phase
+
+```{r}
+data2$Jour <- as.Date(data2$Jour)
+```
+
+
+```{r}
+head(data2)
+```
+
+
+```{r}
+## view des deux datasets
+View(data1)
+View(data2)
+```
+
+
+## 1.2 pretraitement de la variable Poids:
+
+### pour les données de la première phase
+
+```{r}
+any(is.na(data1$Poids))
+```
+
+
+```{r}
+length(which(is.na(data1$Poids)== TRUE))
+```
+on a 34 données manquantes dans la colonne poids sur les 114.
+
+#### choix de la méthode d'imputation :
+
+On choisit simplement de supprimer les jours pour lesquels on n'a pas le poids observé, car bien qu'on observe une faible variable du poids, cela n'exclut pas le fait qu'une personne peut prendre 2kg en un jour et/ou perdre 2kg le lendemain. du coup, estimer ces poids manquants avec de simples méthodes d'imputation comme par moyenne ou par médian ne serait pas judicieux.
+
+```{r}
+data1 <- data1[-which(is.na(data1$Poids)== TRUE),]
+```
+
+
+```{r}
+any(is.na(data1$Poids)) # Vérifie si des valeurs manquantes existent dans Poids
+```
+
+```{r}
+is.numeric(data1$Poids)
+```
+
+
+### pour les données de la deuxième phase
+
+```{r}
+any(is.na(data2$Poids))
+```
+
+il n'y a pas de na donc pas de pretraitement à faire ici.
+
+
+## 1.3 pretraitement de la variable Heure:
+
+### pour les données de la première phase
+
+```{r}
+is.numeric(data1$Heure) # ce ne sont pas des données numériques
+any(is.na(data1$Heure)) # il y a des na
+```
+
+
+```{r}
+library(hms)
+data1$Heure <- as_hms(strptime(gsub("h", ":", data1$Heure), format = "%H:%M"))
+
+```
+
+
+
+```{r}
+# convertissons les heures en format décimal
+data1$Heure <- ifelse(is.na(data1$Heure), NA, as.numeric(format(strptime(data1$Heure, "%H:%M"), "%H")) +
+                           as.numeric(format(strptime(data1$Heure, "%H:%M"), "%M")) / 60)
+
+```
+
+
+
+```{r}
+# imputons les heures manquantes
+# l'idée ici est de trouver le mean des heures les plus proches : c'est la métode d'interpolation
+# Installer le package "zoo" si nécessaire
+library(zoo)
+
+# Fonction pour interpoler les NA par la moyenne des voisins
+data1$Heure <- zoo::na.approx(data1$Heure, na.rm = FALSE)
+
+```
+
+
+
+### pour les données de la deuxième phase
+
+```{r}
+is.numeric(data2$Heure) # ce ne sont pas des données numériques
+any(is.na(data2$Heure)) # il n'y a pas des na
+```
+
+
+```{r}
+library(hms)
+data2$Heure <- as_hms(strptime(gsub("h", ":", data2$Heure), format = "%H:%M"))
+
+```
+
+
+```{r}
+# convertissons les heures en format décimal
+data2$Heure <- ifelse(is.na(data2$Heure), NA, as.numeric(format(strptime(data2$Heure, "%H:%M"), "%H")) +
+                           as.numeric(format(strptime(data2$Heure, "%H:%M"), "%M")) / 60)
+
+```
+
+
+
+## 1.3 plotting des variables de l'étude :
+
+### pour les données de la première phase
+
+
+```{r}
+plot(x=data1$Heure, y=data1$Poids)
+```
+
+cette donnée à 0h doit etre mis en fin de journée comme 0h = 24h
+
+```{r}
+p <- which(data1$Heure == 0)
+```
+
+```{r}
+data1$Heure[p] = 24
+```
+
+
+
+
+### pour les données de la deuxième phase
+
+```{r}
+plot(x=data2$Heure, y=data2$Poids)
+```
+
+
+
+# 2. Lissage par la méthode de regression locale : le poids en fonction de la variable heure
+
+## 2.1 modélisation des différences de poids sans tenir compte du jour, cela donne la variable de poids
+
+
+
+
+```{r}
+res_loess <- loess(Poids~Heure,data=data1,span = 0.3)
+```
+
+
+```{r}
+## ajoutons une colonne des valeurs ajustées dans le data1frame
+data1$y <- res_loess$fitted
+```
+
+
+
+```{r}
+## representation graphique
+library(ggplot2)
+ggplot(data1,aes(x=Heure,y=Poids)) +
+geom_point() +
+geom_line(aes(y=y),col="red",size=1)
+
+```
+
+
+
+# 3.Calculez l’évolution du poids pendant la seconde phase indépendamment des variations dans la journée.
+
+comme dans la consigne, 
+ 104.7kg effectuée à 18h50
+ on va chercher la valeur lissée à 18h50 donc y dans data1 quand heure = 18h50
+ et  la valeur à midi de la série lissée
+ puis trouver l'ecart entre les deux.
+ puisqu’on a observé 104.7kg à 18h50, on peut en déduire que le poids à midi sur cette journée sera 104.7 kg +- cet ecart.
+ 
+ 
+
+```{r}
+valeur_lisse_midi <- predict(res_loess, 12.00)
+valeur_lisse_midi
+```
+
+utiliser la fonction predict (loess, newdata) avec newdata = colonne des heures pour lesquelles on veut les predictions
+
+```{r}
+# on calcule les predictions du poids a midi des jours de la 2e phase
+data2$poids_lisse <- predict(res_loess, data2$Heure)
+```
+
+
+```{r}
+# on calcule lecart entre la valeur lisse a midi et ces poids a midi
+data2$ecart <- valeur_lisse_midi - data2$poids_lisse
+```
+
+
+```{r}
+data2$poids_midi <- data2$Poids + data2$ecart
+```
+
+
+
+```{r}
+## representation graphique
+library(ggplot2)
+ggplot(data2,aes(x=Jour,y=Poids)) +
+geom_point() +
+geom_line(aes(y=poids_midi),col="red",size=1)
+```
+
+
+
+
+#  4. En déduire l’évolution de la quantité matière grasse (en kilogramme) pendant la seconde phase.
+
+l'idée ici est de calculer cette quantité en kg en faisant une règle de trois.
+pour le premier jour si 100% de matière grace donne 104.7
+                        32.8% donne donne x
+                        
+```{r}
+data2$Graisse_kg <- (data2$`Graisse_%` *data2$Poids)/100
+```
+
+
+# Représenter l’évolution de la quantité de matière grasse et la commenter. De plus, indiquer la quantité de matière grasse perdue au terme du régime.
+
+```{r}
+library(ggplot2)
+ggplot(data2,aes(x=Jour,y=Graisse_kg)) +
+geom_line()
+```
+
+La quantité de matière grasse a fortement augmenté entre la fin du mois de mars et le debut du mois d'avril et baisse enormement après le 05 avril.
+
+
+```{r}
+data2$Graisse_kg[1] - data2$Graisse_kg[length(data2$Jour)]
+```
+
+La quantité totale de matière grasse perdue est de  2.4019 kg, passant de Y 34.3416 kg au début à 31.9397 kg à la fin du régime.
+
+
+
+# 6. faire la prévision de matière grasse perdue si le régime avait duré 3 jours de plus
+
+il faut faire une modélisation.
+vue qu'on n'observe pas de tendance, on va plutot essayer de modéliser cette serie de données en utilisant deux regressions lineaires.
+
+## 6.1 pretraitement de la variable jour :
+
+```{r}
+data2$Jour_num <- as.numeric(as.Date(data2$Jour))
+```
+
+
+
+```{r}
+mode(data2$Jour_num)
+```
+
+
+
+
+## 6.2 segmentation du jeu de données de la 2e phase
+
+
+
+```{r}
+# le point le plus haut (jour où il a atteint la quantité de matière grace maximum est 2021-04-01)
+
+which(data2$Graisse_kg==max(data2$Graisse_kg))
+
+```
+
+
+```{r}
+to = which(data2$Graisse_kg==max(data2$Graisse_kg))
+```
+
+
+```{r}
+to
+```
+
+
+```{r}
+ech1 <- data2[(1:to),]
+```
+
+
+
+```{r}
+ech2 <- data2[-(1:to),]
+```
+
+
+```{r}
+head(ech1)
+```
+
+
+## 6.3 visualisation des deux echantillons
+
+```{r}
+library(ggplot2)
+ggplot(ech1,aes(x=Jour,y=Graisse_kg)) +
+geom_point()
+```
+
+
+
+
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()
+```
+
+
+
+
+On voit alors qu'on peut facilement faire des regressions lineaires sur nos deux échantillons.
+
+
+## 6.4 Regression lineaire
+
+### 6.4.1 Echantillon 1
+
+
+```{r}
+res_lm1 <- lm(Graisse_kg~Jour_num, data=ech1)
+```
+
+
+
+```{r}
+library(ggplot2)
+ggplot(ech1,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)
+
+```
+
+
+
+
+### 6.4.2 Echantillon 1
+
+
+```{r}
+res_lm2 <- lm(Graisse_kg~Jour_num, data=ech2)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)
+
+```
+
+
+
+## 6.5 Les trois prochains jours 
+
+```{r}
+t1 <- as.numeric(as.Date("2021-04-08"))
+t2 <- as.numeric(as.Date("2021-04-09"))
+t3 <- as.numeric(as.Date("2021-04-10"))
+
+```
+
+
+```{r}
+data3 <- data.frame(c(t1,t2,t3))
+```
+
+```{r}
+colnames(data3) <- "Jour_num"
+```
+
+
+
+```{r}
+data3
+```
+
+
+```{r}
+graisse_predict <- predict.lm(res_lm2, data3)
+graisse_predict
+```
+
+Choix du modèle : Le choix d'utiliser res_lm2 pour les prévisions est judicieux, car il représente la tendance la plus récente et est donc plus pertinent pour les prévisions à court terme.
+
+## 6.6 visualisation de la quantité de matières grasse predictes
+
+
+```{r}
+data3$Jour <- c(as.Date("2021-04-08"), as.Date("2021-04-09"), as.Date("2021-04-10"))
+data3$Graisse_kg <- graisse_predict
+```
+
+
+```{r}
+data3
+```
+
+
+
+```{r}
+library(ggplot2)
+ggplot(ech2,aes(x=Jour,y=Graisse_kg)) +
+geom_point()+
+geom_smooth(method = "lm", se = TRUE)+
+geom_point(data = data3, aes(x = Jour, y = Graisse_kg), color = "red")
+
+
+```
+
+
+```{r}
+data2$Graisse_kg[1] - data3$Graisse_kg[length(data3$Graisse_kg)]
+```
+
+
+
+Alors si cette personne avait continué le regime, elle aurait perdu 4.218229 kg contre 2.4019 kg si elle n'avait pas continué le regime.
+
+
+
+
